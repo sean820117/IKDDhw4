@@ -4,13 +4,20 @@ import numpy as np
 import os
 
 class PageRank:
-	def construct_page_list(self, page):
+	dead_node = []
+	page = []
+	page_tmp = []
+
+	def __init__(self, page):
 		page_tmp = []
+		self.page = page
 		for num_page in page:
-			page_tmp.append([num_page[0],re.findall('http://page\d.txt', num_page[1])])
-		return self.de_DeadEnd(page_tmp)
+			tmp = [num_page[0],re.findall('http://page\d.txt', num_page[1])]
+			page_tmp.append(tmp)
+		self.page_tmp = page_tmp
 
 	def de_DeadEnd(self, page_tmp):
+		dead_node = self.dead_node
 		front = 0
 		end = len(page_tmp)
 		flag = 0
@@ -29,13 +36,17 @@ class PageRank:
 						else:
 							f = f + 1
 				end = end - 1
+				dead_node.append(tmp)
 			else :
 				front = front + 1
 		if flag == 1:
 			page_tmp = self.de_DeadEnd(page_tmp)
+
+		self.dead_node = dead_node
 		return page_tmp
 
-	def get_Rank(self, page_true):
+	def get_Rank(self):
+		page_true = self.de_DeadEnd(self.page_tmp)
 		P_matrix = []
 		for k in range(0, len(page_true)):
 			row = []
@@ -58,9 +69,40 @@ class PageRank:
 		Q_matrix = np.linspace(1.0/len(P_matrix),1.0/len(P_matrix),len(P_matrix)) 
 
 		for i in range(40):
-			Q_matrix = np.dot(P_matrix,Q_matrix) #why??????
-		return Q_matrix
+			Q_matrix = np.dot(P_matrix,Q_matrix)
 
+		orig = []
+		for num_page in self.page:
+				tmp = [num_page[0],re.findall('http://page\d.txt', num_page[1])]
+				orig.append(tmp)
+
+		index = {}
+		for d in range(0, len(page_true)):
+			index[page_true[d][0]] = Q_matrix[d]
+
+		for dead in self.dead_node:
+			ans = self.recover_dead_node(dead,orig,index)	
+			index[dead] = ans
+
+		return index
+
+	def recover_dead_node(self, dead, origin, index):
+		result = []
+		for node in origin:
+			for link in node[1]:
+				if cmp(dead, link) == 0:
+					flag = 0
+					for ii in self.dead_node:
+						if cmp(ii, node[0]) == 0:
+							flag = 1
+					if flag == 1:
+						result.append(self.recover_dead_node(node[0],origin,index))
+					else :
+						result.append(1.0/len(node[1])*index[node[0]])
+		ans = 0
+		for itera in result:
+			ans = ans + itera
+		return ans	
 
 def main():
 	page = []
@@ -78,13 +120,8 @@ def main():
 			print "Open file error or no file!"
 			exit()
 
-	rk = PageRank()
-	page_no_dead = rk.construct_page_list(page)
-	rank_matrix = rk.get_Rank(page_no_dead)
-
-	index = {}
-	for d in range(0, len(page_no_dead)):
-		index[page_no_dead[d][0]] = rank_matrix[d]
+	rk = PageRank(page)
+	result_index = rk.get_Rank()
 
 	while True:
 		search_dict = {}
@@ -92,8 +129,8 @@ def main():
 		for num_page in page:
 			result = re.findall(search,num_page[1])
 			if len(result) != 0:
-				if index.get(num_page[0]) != None:
-					search_dict[num_page[0]] = index[num_page[0]]
+				if result_index.get(num_page[0]) != None:
+					search_dict[num_page[0]] = result_index[num_page[0]]
 				else:
 					search_dict[num_page[0]] = 0	
 
